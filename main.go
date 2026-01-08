@@ -12,11 +12,18 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	tf.Announce = "http://bt.okmp3.ru:2710/announce"
 
-	fmt.Println("Name:", tf.Name)
-	fmt.Println("Tracker:", tf.Announce)
-	fmt.Println("File size:", tf.Length)
-	fmt.Println("Piece length:", tf.PieceLength)
-	fmt.Println("Number of pieces:", len(tf.PieceHashes))
-	fmt.Printf("Info hash: %x\n", tf.InfoHash)
+	var peerID [20]byte
+	copy(peerID[:], []byte("GO-TORRENT-CLIENT"))
+
+	peers, err := tf.GetPeers(peerID, 6881)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("Peers found:", len(peers))
+	for i := 0; i < min(5, len(peers)); i++ {
+		fmt.Println(peers[i].IP, peers[i].Port)
+	}
 }
