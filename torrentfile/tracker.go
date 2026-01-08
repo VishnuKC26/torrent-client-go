@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/jackpal/bencode-go"
 )
@@ -20,17 +21,27 @@ type Peer struct {
 	Port uint16
 }
 
+/* ---------- Tracker URL ---------- */
+
 func (t *TorrentFile) buildTrackerURL(peerID [20]byte, port uint16) (string, error) {
+
+	if t.Announce == "" {
+		return "", fmt.Errorf("empty announce URL")
+	}
 
 	base, err := url.Parse(t.Announce)
 	if err != nil {
 		return "", err
 	}
 
-	params := url.Values{
+	// Only HTTP trackers supported here
+	if base.Scheme != "http" && base.Scheme != "https" {
+		return "", fmt.Errorf("unsupported tracker scheme: %s", base.Scheme)
+	}
 
+	params := url.Values{
 		"info_hash":  []string{string(t.InfoHash[:])},
-		"peer-id":    []string{string(peerID[:])},
+		"peer_id":    []string{string(peerID[:])},
 		"port":       []string{fmt.Sprintf("%d", port)},
 		"uploaded":   []string{"0"},
 		"downloaded": []string{"0"},
@@ -42,44 +53,59 @@ func (t *TorrentFile) buildTrackerURL(peerID [20]byte, port uint16) (string, err
 	return base.String(), nil
 }
 
-func parsePeers(peersBin string)([]Peer,error){
+/* ---------- Parse compact peers ---------- */
 
-	const peerSize = 6 // 4 bytes IP + 2 bytes Port
+func parsePeers(peersBin string) ([]Peer, error) {
 
-	numPeers := len(peersBin)/peerSize
+	const peerSize = 6 // 4 bytes IP + 2 bytes port
 
-	peers := make([]Peer,0,numPeers)
+	if len(peersBin)%peerSize != 0 {
+		return nil, fmt.Errorf("invalid peers binary length")
+	}
 
-	for i:=0; i+peerSize <= len(peersBin); i+= peerSize {
+	numPeers := len(peersBin) / peerSize
+	peers := make([]Peer, 0, numPeers)
 
-		ip := net.IP(peersBin[i:i+4])
-		port := binary.BigEndian.Uint16([]byte(peersBin[i+4:i+6]))
+	for i := 0; i < len(peersBin); i += peerSize {
 
-		peers = append(peers,Peer{
-			IP: ip,
+		ip := net.IP([]byte(peersBin[i : i+4]))
+		port := binary.BigEndian.Uint16([]byte(peersBin[i+4 : i+6]))
+
+		peers = append(peers, Peer{
+			IP:   ip,
 			Port: port,
 		})
 	}
 
-	return peers , nil
+	return peers, nil
 }
 
-func (t *TorrentFile) GetPeers(peerID [20]byte , port uint16)([]Peer, error){
+/* ---------- Get peers from tracker ---------- */
 
-	url,err := t.buildTrackerURL(peerID,port)
+func (t *TorrentFile) GetPeers(peerID [20]byte, port uint16) ([]Peer, error) {
+
+	trackerURL, err := t.buildTrackerURL(peerID, port)
 	if err != nil {
 		return nil, err
 	}
 
-	resp , err := http.Get(url)
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	resp, err := client.Get(trackerURL)
 	if err != nil {
-		return nil,err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("tracker returned status %s", resp.Status)
+	}
+
 	var tr bencodeTrackerResp
-	if err := bencode.Unmarshal(resp.Body,&tr); err != nil {
-		return nil,err
+	if err := bencode.Unmarshal(resp.Body, &tr); err != nil {
+		return nil, err
 	}
 
 	return parsePeers(tr.Peers)
