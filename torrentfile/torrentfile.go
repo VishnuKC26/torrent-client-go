@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"fmt"
+
 	"os"
 
 	"github.com/jackpal/bencode-go"
@@ -18,8 +19,6 @@ type TorrentFile struct {
 	Name        string
 }
 
-/* ---------- bencode structs ---------- */
-
 type bencodeTorrent struct {
 	Announce     string      `bencode:"announce"`
 	AnnounceList [][]string  `bencode:"announce-list"`
@@ -32,8 +31,6 @@ type bencodeInfo struct {
 	Length      int    `bencode:"length"`
 	Name        string `bencode:"name"`
 }
-
-/* ---------- Open ---------- */
 
 func Open(path string) (*TorrentFile, error) {
 
@@ -81,8 +78,6 @@ func Open(path string) (*TorrentFile, error) {
 	return &tf, nil
 }
 
-/* ---------- helpers ---------- */
-
 func (i *bencodeInfo) infoHash() ([20]byte, error) {
 	var buf bytes.Buffer
 	if err := bencode.Marshal(&buf, *i); err != nil {
@@ -101,7 +96,7 @@ func splitPieceHashes(pieces string) ([][20]byte, error) {
 	numHashes := len(pieces) / hashLen
 	hashes := make([][20]byte, numHashes)
 
-	for i := 0; i < numHashes; i++ {
+	for i := range numHashes {
 		copy(hashes[i][:], pieces[i*hashLen:(i+1)*hashLen])
 	}
 
