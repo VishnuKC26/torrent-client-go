@@ -8,17 +8,13 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/VishnuKC26/torrent-client-go/peer"
 	"github.com/jackpal/bencode-go"
 )
 
 type bencodeTrackerResp struct {
 	Interval int    `bencode:"interval"`
 	Peers    string `bencode:"peers"`
-}
-
-type Peer struct {
-	IP   net.IP
-	Port uint16
 }
 
 /* ---------- Tracker URL ---------- */
@@ -55,7 +51,7 @@ func (t *TorrentFile) buildTrackerURL(peerID [20]byte, port uint16) (string, err
 
 /* ---------- Parse compact peers ---------- */
 
-func parsePeers(peersBin string) ([]Peer, error) {
+func parsePeers(peersBin string) ([]peer.Peer, error) {
 
 	const peerSize = 6 // 4 bytes IP + 2 bytes port
 
@@ -64,14 +60,14 @@ func parsePeers(peersBin string) ([]Peer, error) {
 	}
 
 	numPeers := len(peersBin) / peerSize
-	peers := make([]Peer, 0, numPeers)
+	peers := make([]peer.Peer, 0, numPeers)
 
 	for i := 0; i < len(peersBin); i += peerSize {
 
 		ip := net.IP([]byte(peersBin[i : i+4]))
 		port := binary.BigEndian.Uint16([]byte(peersBin[i+4 : i+6]))
 
-		peers = append(peers, Peer{
+		peers = append(peers, peer.Peer{
 			IP:   ip,
 			Port: port,
 		})
@@ -82,7 +78,7 @@ func parsePeers(peersBin string) ([]Peer, error) {
 
 /* ---------- Get peers from tracker ---------- */
 
-func (t *TorrentFile) GetPeers(peerID [20]byte, port uint16) ([]Peer, error) {
+func (t *TorrentFile) GetPeers(peerID [20]byte, port uint16) ([]peer.Peer, error) {
 
 	trackerURL, err := t.buildTrackerURL(peerID, port)
 	if err != nil {
