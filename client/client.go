@@ -3,6 +3,7 @@ package client
 import (
 	"encoding/binary"
 	"fmt"
+	"log"
 	"net"
 	"time"
 
@@ -52,22 +53,26 @@ func New(peer peer.Peer, peerID, infoHash [20]byte) (*Client, error) {
 		return nil, fmt.Errorf("infohash mismatch")
 	}
 
+	c := &Client{
+		Conn:   conn,
+		Choked: true,
+	}
+
 	msg, err := message.Read(conn)
 	if err != nil {
 		conn.Close()
 		return nil, err
 	}
 
-	if msg == nil || msg.ID != message.MsgBitfield {
-		conn.Close()
-		return nil, fmt.Errorf("expected bitfield")
+	if msg != nil && msg.ID == message.MsgBitfield {
+		c.Bitfield = bitfield.Bitfield(msg.Payload)
+	} else {
+		// No bitfield received → optimistic assumption
+		c.Bitfield = nil
 	}
 
-	return &Client{
+	return c, nil
 
-		Conn:     conn,
-		Choked:   true,
-		Bitfield: bitfield.Bitfield(msg.Payload)}, nil
 }
 
 func (c *Client) Read() (*message.Message, error) {
@@ -99,6 +104,11 @@ func (c *Client) SendHave(index int) error {
 }
 
 func (c *Client) SendRequest(index, begin, length int) error {
+
+	log.Printf(
+		"SEND REQUEST → piece=%d begin=%d length=%d",
+		index, begin, length,
+	)
 	payload := make([]byte, 12)
 
 	binary.BigEndian.PutUint32(payload[0:4], uint32(index))

@@ -80,7 +80,7 @@ func ParseHave(msg *Message) (int, error) {
 	return int(index), nil
 }
 
-func ParsePiece(msg *Message, buf []byte) (int, error) {
+func ParsePiece(index int,msg *Message, buf []byte) (int, error) {
 	if msg.ID != MsgPiece {
 		return 0, fmt.Errorf("expected PIECE message")
 	}
@@ -89,11 +89,14 @@ func ParsePiece(msg *Message, buf []byte) (int, error) {
 		return 0, fmt.Errorf("payload too short")
 	}
 
-	index := binary.BigEndian.Uint32(msg.Payload[0:4])
+	parsedIndex := binary.BigEndian.Uint32(msg.Payload[0:4])
+	if int(parsedIndex) != index {
+		return 0,fmt.Errorf("piece index mismatch")
+	}
 	begin := binary.BigEndian.Uint32(msg.Payload[4:8])
 
-	copy(buf[begin:], msg.Payload[8:])
-	return int(index), nil
+	n := copy(buf[begin:], msg.Payload[8:])
+	return n, nil
 }
 
 // peer message format
