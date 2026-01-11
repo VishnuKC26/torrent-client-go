@@ -1,198 +1,104 @@
 BitTorrent Client in Go
+A from-scratch BitTorrent client written in Go, implementing the core BitTorrent protocol. This project handles everything from bencode parsing to concurrent piece downloading and SHA-1 integrity verification.
 
-A from-scratch BitTorrent client written in Go, implementing the core BitTorrent protocol including torrent parsing, tracker communication, peer handshakes, message exchange, piece downloading, and integrity verification.
-
-This project is inspired by and structurally aligned with
-👉 https://github.com/veggiedefender/torrent-client
-
-and the BitTorrent protocol walkthrough by Jesse Li.
+This project is inspired by and structurally aligned with the torrent-client by veggiedefender and the BitTorrent protocol walkthrough by Jesse Li.
 
 🚀 Features Implemented
 Torrent & Metadata
+Bencode Decoding: Full support for parsing .torrent files.
 
-Bencode decoding of .torrent files
+Metadata Extraction: Extracts Tracker URL, file metadata, piece length, and SHA-1 hashes.
 
-Extraction of:
+Info-Hash Computation: Accurate SHA-1 calculation of the info dictionary.
 
-Tracker URL (announce)
+Tracker & Peer Discovery
+HTTP Tracker Support: Full communication with trackers via GET requests.
 
-File name & size
-
-Piece length
-
-Piece SHA-1 hashes
-
-Computation of info-hash (SHA-1 of info dictionary)
-
-Tracker Communication
-
-HTTP tracker support
-
-Tracker URL construction with correct query parameters
-
-Compact peer list parsing
-
-Peer discovery (IP:Port)
+Compact Peer Parsing: Efficiently parses binary peer lists into IP:Port format.
 
 Peer Protocol (Wire Protocol)
+TCP Handshake: Reliable implementation of the BitTorrent handshake.
 
-TCP connection with peers
+Message Framing: Support for Keep-alive, Choke/Unchoke, Interested, Have, Bitfield, Request, and Piece.
 
-BitTorrent handshake implementation
-
-Message framing:
-
-Keep-alive
-
-Choke / Unchoke
-
-Interested / Not Interested
-
-Have
-
-Bitfield
-
-Request
-
-Piece
-
-Defensive message parsing and validation
+Validation: Defensive parsing to handle malformed peer data.
 
 Download Engine
+Concurrency: High-performance peer workers using Goroutines.
 
-Concurrent peer workers (one connection per peer)
+Pipelining: Configurable request backlog to maximize throughput.
 
-Piece-based downloading
+Integrity Checks: Per-piece SHA-1 verification before writing to disk.
 
-Request pipelining with configurable backlog
-
-SHA-1 integrity verification per piece
-
-Automatic retry of failed pieces
-
-Safe handling of misbehaving peers
-
-Concurrency & Safety
-
-Goroutines for parallel peer downloads
-
-Channel-based work queue and result collection
-
-Timeouts to avoid hanging peers
-
-Deadlock-safe orchestration
+Fault Tolerance: Automatic retries for failed or corrupted pieces.
 
 📂 Project Structure
+Plaintext
+
 .
-├── main.go                 # Entry point
-├── torrentfile/            # Torrent parsing & tracker logic
-│   ├── torrentfile.go
-│   └── tracker.go
-├── peers/                  # Peer representation & parsing
-│   └── peers.go
-├── handshake/              # BitTorrent handshake
-│   └── handshake.go
-├── message/                # Wire protocol messages
-│   └── message.go
-├── bitfield/               # Piece availability tracking
-│   └── bitfield.go
-├── client/                 # Peer connection abstraction
-│   └── client.go
-└── p2p/                    # Download orchestration
-    └── p2p.go
+├── main.go                 # Entry point: Orchestrates the download
+├── torrentfile/            # Torrent parsing & Tracker communication logic
+├── peers/                  # Peer representation & binary address parsing
+├── handshake/              # Peer-to-peer handshake implementation
+├── message/                # Wire protocol message serialization
+├── bitfield/               # Tracking which pieces peers have
+├── client/                 # TCP connection abstraction & message handling
+└── p2p/                    # Download orchestration & concurrency logic
+▶️ How It Works
+Parse: Decodes the .torrent file and extracts the cryptographic info-hash.
 
-▶️ How It Works (High Level)
+Discover: Contacts the tracker to receive a list of active peers in the swarm.
 
-Parse .torrent file
+Handshake: Establishes a TCP connection and verifies the protocol handshake with peers.
 
-Decode bencoded metadata
+Download: Workers request blocks, assemble them into pieces, and verify them against the info-hash.
 
-Compute info-hash
-
-Contact tracker
-
-Retrieve peer list
-
-Connect to peers
-
-Perform handshake
-
-Exchange protocol messages
-
-Download pieces
-
-Request blocks from peers
-
-Assemble pieces
-
-Verify SHA-1 integrity
-
-Assemble file
-
-Combine all verified pieces into final output
+Assemble: Once all pieces are verified, they are joined to create the final output file.
 
 🧪 Usage
+Ensure you have Go installed.
+
+Bash
+
+# Clone the repository
+git clone https://github.com/your-username/your-repo-name.git
+cd your-repo-name
+
+# Run the client
 go run . path/to/file.torrent
-
-
 Example:
 
+Bash
+
 go run . torrentfile/testdata/debian.torrent
-
 ⚠️ Important Notes on Swarm Behavior
+This client implements the core download protocol but does not currently implement seeding (uploading) or optimistic unchoking.
 
-This client correctly implements the BitTorrent protocol, but:
+[!IMPORTANT] Because BitTorrent relies on a "tit-for-tat" mechanism, some peers in public swarms (like Debian) may refuse to unchoke this client because it is not uploading back to them. This is expected behavior for a download-only educational client.
 
-It does not upload pieces
+🧠 Lessons Learned
+Network Protocols: Deep dive into binary framing and stateful TCP communication.
 
-It does not implement optimistic unchoking
+Concurrency Patterns: Using Go channels to manage a work queue across multiple workers.
 
-In public swarms (e.g., Debian torrents), many peers may never unchoke this client due to BitTorrent’s tit-for-tat mechanism.
+Data Integrity: Implementing cryptographic verification in a streaming context.
 
-The client works best when:
+Defensive Programming: Handling flaky network connections and unreliable peers.
 
-Tested against a local seed
+📌 Future Improvements
+[ ] UDP Tracker Support: Support for the udp:// tracker protocol.
 
-Used with small or lenient swarms
+[ ] Seeding: Implement uploading and optimistic unchoking.
 
-Extended with optimistic unchoking or upload support
+[ ] Rarest-First: Optimize piece selection to improve swarm health.
 
-This behavior is expected and protocol-compliant, not a bug.
+[ ] Resume: Save progress to disk to allow resuming interrupted downloads.
 
-🧠 What This Project Demonstrates
-
-Deep understanding of network protocols
-
-Binary data parsing and serialization
-
-Concurrency with goroutines and channels
-
-TCP socket programming
-
-Distributed systems behavior (peer incentives)
-
-Defensive programming against unreliable peers
-
-📌 Future Improvements (Optional)
-
-Optimistic unchoking
-
-Upload (seeding) support
-
-Peer prioritization (rarest-first)
-
-Resume support
-
-UDP tracker support
-
-DHT peer discovery
+[ ] DHT: Implement distributed hash tables for trackerless discovery.
 
 📚 References
-
 BitTorrent Protocol Specification
 
 Jesse Li’s BitTorrent Walkthrough
-https://blog.jse.li/posts/torrent/
 
-veggiedefender torrent client
-https://github.com/veggiedefender/torrent-client
+veggiedefender/torrent-client
